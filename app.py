@@ -4,7 +4,7 @@ import io
 import json
 import os
 import tempfile
-import yt_dlp  # 새로 추가된 라이브러리
+import yt_dlp
 
 st.set_page_config(page_title="Data Converter", layout="centered")
 
@@ -97,51 +97,84 @@ with tab2:
 
 with tab3:
     st.subheader("유튜브 변환기 (YouTube → MP3/MP4)")
-    st.write("유튜브 영상 링크를 입력하면 음원(MP3) 또는 영상(MP4) 파일로 변환하여 다운로드합니다.")
+    st.write("유튜브 영상 링크를 입력하고 원하는 화질이나 음질을 선택해 다운로드하세요.")
     
     url = st.text_input("유튜브 영상 링크(URL)를 입력하세요", placeholder="https://www.youtube.com/watch?v=...")
-    format_choice = st.radio("다운로드 형식 선택", ["MP4 (영상)", "MP3 (음원)"])
+    
+    # 1. 다운로드 형식 선택
+    format_choice = st.radio("다운로드 형식 선택", ["MP4 (영상)", "MP3 (음원)"], horizontal=True)
+    
+    # 2. 형식을 선택함에 따라 동적으로 품질 선택창이 바뀜
+    if format_choice == "MP4 (영상)":
+        quality_choice = st.selectbox(
+            "🎥 영상 화질 선택 (영상이 해당 화질을 지원하지 않으면 가능한 최고 화질로 자동 조정됩니다)", 
+            ["최고 화질 (Best)", "1080p (FHD)", "720p (HD)", "480p", "360p"]
+        )
+    else:
+        quality_choice = st.selectbox(
+            "🎵 음원 품질 선택", 
+            ["320kbps (최상 - 추천)", "192kbps (고음질)", "128kbps (일반)"]
+        )
     
     if st.button("변환 및 다운로드 준비"):
-        if not url:
+        # URL의 지저분한 공유 파라미터(?si=...) 제거 (에러 방지용)
+        clean_url = url.split("?si=")[0] if "?si=" in url else url
+        
+        if not clean_url:
             st.warning("유튜브 링크를 입력해주세요.")
         else:
-            with st.spinner("영상을 변환 중입니다. (파일 크기에 따라 다소 시간이 걸릴 수 있습니다)"):
+            with st.spinner("영상을 변환 중입니다. (선택한 품질과 파일 크기에 따라 다소 시간이 걸릴 수 있습니다)"):
                 try:
-                    # 안전한 다운로드를 위한 임시 폴더 생성
                     temp_dir = tempfile.mkdtemp()
                     
+                    # 🚀 공통 옵션 (403 Forbidden 에러 우회 포함)
                     ydl_opts = {
                         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                         'quiet': True,
                         'no_warnings': True,
+                        'extractor_args': {
+                            'youtube': ['player_client=android', 'player_skip=webpage']
+                        },
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
+                        }
                     }
                     
+                    # 🚀 품질 옵션 설정 분기
                     if format_choice == "MP3 (음원)":
                         ydl_opts['format'] = 'bestaudio/best'
+                        # "320kbps (최상)"에서 "320"만 추출
+                        bitrate = quality_choice.split("kbps")[0] 
                         ydl_opts['postprocessors'] = [{
                             'key': 'FFmpegExtractAudio',
                             'preferredcodec': 'mp3',
-                            'preferredquality': '192',
+                            'preferredquality': bitrate,
                         }]
                     else:
-                        # 영상과 오디오를 합친 가장 좋은 품질의 MP4를 가져오거나 단일 파일 사용
-                        ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+                        if quality_choice == "최고 화질 (Best)":
+                            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+                        else:
+                            # "1080p (FHD)"에서 "1080"만 추출
+                            height = quality_choice.split("p")[0]
+                            # 선택한 해상도(height) 이하의 최고 화질을 찾도록 설정
+                            ydl_opts['format'] = f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best'
                     
+                    # 다운로드 실행
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        # 다운로드 실행
-                        info = ydl.extract_info(url, download=True)
+                        info = ydl.extract_info(clean_url, download=True)
                         
-                        # 다운로드된 파일 찾기
                         downloaded_file = None
                         for f in os.listdir(temp_dir):
                             downloaded_file = os.path.join(temp_dir, f)
                             break
                     
+                    # 버튼 생성
                     if downloaded_file and os.path.exists(downloaded_file):
                         file_name = os.path.basename(downloaded_file)
                         with open(downloaded_file, "rb") as file:
-                            st.success("변환이 완료되었습니다! 아래 버튼을 눌러 파일을 저장하세요.")
+                            st.success("✨ 변환이 완료되었습니다! 아래 버튼을 눌러 저장하세요.")
                             st.download_button(
                                 label=f"📥 {file_name} 다운로드",
                                 data=file,
