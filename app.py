@@ -6,13 +6,14 @@ import os
 import tempfile
 import yt_dlp
 import re
+import zipfile
 
 st.set_page_config(page_title="Data Converter", layout="centered")
 
 st.title("📂 통합 데이터 변환기")
 
-# 탭을 3개로 확장하여 유튜브 기능 추가
-tab1, tab2, tab3 = st.tabs(["SQL → CSV 변환", "ipynb → Text 변환", "YouTube 다운로더"])
+# 탭을 4개로 확장
+tab1, tab2, tab3, tab4 = st.tabs(["SQL → CSV 변환", "ipynb → Text 변환", "YouTube 다운로더", "ZIP → APK 변환"])
 
 with tab1:
     st.subheader("사전 DB 변환기 (SQL → CSV)")
@@ -142,15 +143,14 @@ with tab3:
                 try:
                     temp_dir = tempfile.mkdtemp()
                     
-                    # 🚀 초강력 403 에러 우회 옵션 (캐시 삭제, 다중 클라이언트, IP 강제, 쿠키 감지)
                     ydl_opts = {
                         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
                         'quiet': True,
                         'no_warnings': True,
                         'nocheckcertificate': True,
-                        'source_address': '0.0.0.0', # IPv4 강제 (클라우드 IPv6 차단 회피)
-                        'rm_cachedir': True, # yt-dlp의 밴 기록 캐시를 매번 삭제
-                        'geo_bypass': True, # 지역 제한 우회
+                        'source_address': '0.0.0.0', 
+                        'rm_cachedir': True, 
+                        'geo_bypass': True, 
                         'extractor_args': {
                             'youtube': ['player_client=mweb,android,tv', 'player_skip=webpage,configs'] 
                         },
@@ -163,7 +163,6 @@ with tab3:
                         'progress_hooks': [progress_hook],
                     }
                     
-                    # 🚀 [가장 중요] 쿠키 파일이 같은 폴더에 있으면 무조건 적용
                     if os.path.exists("cookies.txt"):
                         ydl_opts['cookiefile'] = 'cookies.txt'
                     
@@ -207,5 +206,32 @@ with tab3:
                     status_text.empty() 
                     st.error(f"오류가 발생했습니다. 링크가 정확한지 확인해 주세요.\n\n에러 내용: {e}")
 
+with tab4:
+    st.subheader("안드로이드 패키지 변환기 (ZIP → APK)")
+    st.write("안드로이드 구조가 포함된 ZIP 파일의 확장자를 APK 설치 파일로 안전하게 변경합니다.")
+    
+    uploaded_zip = st.file_uploader(".zip 파일을 업로드하세요", type=["zip"], key="zip_uploader")
+    
+    if uploaded_zip is not None:
+        if st.button("APK 변환 시작"):
+            try:
+                # 업로드된 파일이 유효한 ZIP 파일인지 검사
+                if zipfile.is_zipfile(uploaded_zip):
+                    # 파일명에서 .zip을 떼고 .apk로 변경
+                    original_name = uploaded_zip.name
+                    apk_filename = original_name.rsplit('.', 1)[0] + ".apk"
+                    
+                    st.success("✅ 파일 확장자 변환이 완료되었습니다! 아래 버튼을 눌러 안드로이드에 설치하세요.")
+                    st.download_button(
+                        label=f"📥 {apk_filename} 다운로드",
+                        data=uploaded_zip.getvalue(),
+                        file_name=apk_filename,
+                        mime="application/vnd.android.package-archive"
+                    )
+                else:
+                    st.error("유효한 ZIP 파일이 아닙니다. 파일이 손상되었는지 확인해 주세요.")
+            except Exception as e:
+                st.error(f"변환 중 오류가 발생했습니다: {e}")
+
 st.divider()
-st.info("💡 **마지막 팁:** 이 코드마저 Streamlit 서버에서 막힌다면, IP 자체가 영구 차단된 것입니다. 크롬 확장프로그램으로 유튜브 `cookies.txt`를 추출해 코드가 있는 폴더에 올리시거나, **본인의 컴퓨터에서 직접 실행**하시는 것 외에는 방법이 없습니다.")
+st.info("💡 **팁:** 유튜브 다운로더가 스트림릿 서버에서 막힌다면, 본인의 로컬 PC 환경이나 Hugging Face Spaces 같은 다른 서버로 옮겨서 실행해 보세요.")
