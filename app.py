@@ -5,8 +5,14 @@ import json
 import zipfile
 import cv2
 import numpy as np
-import mediapipe as mp
+import os
 from PIL import Image
+
+# MediaPipe 내부 모듈 직접 호출 (AttributeError 우회)
+import mediapipe as mp
+import mediapipe.python.solutions.face_mesh as mp_face_mesh
+import mediapipe.python.solutions.drawing_utils as mp_drawing
+import mediapipe.python.solutions.drawing_styles as mp_drawing_styles
 
 st.set_page_config(page_title="통합 데이터 도구", layout="centered")
 
@@ -74,7 +80,7 @@ with tab2:
                 st.error(f"오류: {e}")
 
 # ==========================================
-# 탭 3: 얼굴 상세 분석기 (MediaPipe AI 적용)
+# 탭 3: 얼굴 상세 분석기 (MediaPipe 오류 우회 적용)
 # ==========================================
 with tab3:
     st.subheader("🤖 AI 안면 구조 및 랜드마크 분석기")
@@ -90,11 +96,6 @@ with tab3:
                 try:
                     img_array = np.array(image)
                     
-                    # MediaPipe 호출 
-                    mp_face_mesh = mp.solutions.face_mesh
-                    mp_drawing = mp.solutions.drawing_utils
-                    mp_drawing_styles = mp.solutions.drawing_styles
-                    
                     with mp_face_mesh.FaceMesh(
                         static_image_mode=True, 
                         max_num_faces=1, 
@@ -109,7 +110,6 @@ with tab3:
                             annotated_image = img_array.copy()
                             face_landmarks = results.multi_face_landmarks[0]
                             
-                            # 468개 좌표 그리기
                             mp_drawing.draw_landmarks(
                                 image=annotated_image,
                                 landmark_list=face_landmarks,
@@ -127,7 +127,6 @@ with tab3:
                             
                             st.image(annotated_image, caption="AI 랜드마크 스캔 완료", use_container_width=True)
                             
-                            # 픽셀 좌표 거리 계산
                             h, w, _ = img_array.shape
                             left_eye = face_landmarks.landmark[33]
                             right_eye = face_landmarks.landmark[263]
@@ -145,24 +144,21 @@ with tab3:
                             st.success("✅ 실제 AI 안면 분석이 완료되었습니다.")
                             st.markdown(f"""
                             ### 📊 실제 측정 데이터 기반 리포트
-                            
                             **1. 감지된 특징점**
                             - 모델이 얼굴에서 총 **468개**의 3D 랜드마크를 성공적으로 인식했습니다.
-                            
                             **2. 주요 비율 분석 (Real Data)**
                             - 양 눈의 양끝 픽셀 거리: `{eye_distance:.2f}px`
                             - 코끝에서 턱끝까지의 수직 거리: `{nose_to_chin:.2f}px`
-                            - **분석 코멘트**: "MediaPipe 텐서플로우 모델이 얼굴 윤곽과 이목구비 깊이를 정상적으로 추적했습니다."
                             """)
                 except Exception as e:
-                    st.error(f"MediaPipe 분석 중 오류 발생 (requirements.txt 버전을 확인하세요): {e}")
+                    st.error(f"분석 중 오류 발생: {e}")
 
 # ==========================================
-# 탭 4: 인스타그램 언팔 확인기 (강력해진 최신버전)
+# 탭 4: 인스타그램 언팔 확인기 (버그 완벽 수정)
 # ==========================================
 with tab4:
     st.subheader("🕵️ 인스타그램 언팔로워(맞팔) 자동 분석기")
-    st.markdown("인스타그램에서 다운받은 **.zip 파일**을 그대로 업로드하세요. 쪼개진 모든 팔로워 파일을 합쳐서 정확히 분석합니다.")
+    st.markdown("인스타그램에서 다운받은 **.zip 파일**을 그대로 업로드하세요.")
     
     uploaded_zip = st.file_uploader("인스타 정보 다운로드 파일 (.zip)", type=["zip"], key="ig_zip")
 
@@ -171,33 +167,40 @@ with tab4:
             try:
                 followers_data_list = []
                 following_data_list = []
+                has_html_instead = False
                 
-                # ZIP 파일 내부의 모든 follower/following 관련 JSON 파일 찾기
                 with zipfile.ZipFile(uploaded_zip, 'r') as z:
                     for filename in z.namelist():
-                        lower_name = filename.lower()
-                        if lower_name.endswith('.json'):
-                            if 'follower' in lower_name:
+                        # 파일 이름만 추출 (폴더 경로 무시)
+                        basename = os.path.basename(filename).lower()
+                        
+                        if basename.startswith('follower'):
+                            if basename.endswith('.json'):
                                 with z.open(filename) as f:
                                     followers_data_list.append(json.load(f))
-                            elif 'following' in lower_name:
+                            elif basename.endswith('.html'):
+                                has_html_instead = True
+                        elif basename.startswith('following'):
+                            if basename.endswith('.json'):
                                 with z.open(filename) as f:
                                     following_data_list.append(json.load(f))
+                            elif basename.endswith('.html'):
+                                has_html_instead = True
                 
                 if not followers_data_list or not following_data_list:
-                    st.error("ZIP 파일 내부에 팔로워/팔로잉 데이터가 없습니다. 인스타에서 전체 데이터를 다운받았는지 확인하세요.")
+                    if has_html_instead:
+                        st.error("🚨 삐빅! 인스타그램에서 데이터를 **'HTML'** 형식으로 잘못 다운받으셨습니다. 다시 인스타 설정에 들어가셔서 다운로드 형식을 반드시 **'JSON'**으로 변경한 후 새로 받아주세요!")
+                    else:
+                        st.error("ZIP 파일 내부에 팔로워/팔로잉 JSON 파일이 없습니다. 정상적인 인스타 다운로드 파일인지 확인해주세요.")
                 else:
-                    # 인스타 최신/구형 데이터 구조 모두 대응하는 파싱 함수
                     def extract_usernames(json_list):
                         usernames = set()
                         def search_keys(obj):
                             if isinstance(obj, dict):
-                                # 최신 인스타 포맷
                                 if "string_list_data" in obj and isinstance(obj["string_list_data"], list):
                                     for item in obj["string_list_data"]:
                                         if isinstance(item, dict) and "value" in item:
                                             usernames.add(item["value"])
-                                # 구형 인스타 포맷
                                 elif "href" in obj and "value" in obj and isinstance(obj["href"], str) and "instagram.com" in obj["href"]:
                                     usernames.add(obj["value"])
                                 else:
