@@ -87,114 +87,118 @@ with tab3:
         
         if st.button("AI 정밀 스캔 시작"):
             with st.spinner("AI 모델이 얼굴 랜드마크를 추출 중입니다..."):
-                # PIL 이미지를 OpenCV용 Numpy 배열로 변환
-                img_array = np.array(image)
-                
-                # MediaPipe Face Mesh 초기화
-                mp_face_mesh = mp.solutions.face_mesh
-                mp_drawing = mp.solutions.drawing_utils
-                mp_drawing_styles = mp.solutions.drawing_styles
-                
-                with mp_face_mesh.FaceMesh(
-                    static_image_mode=True, 
-                    max_num_faces=1, 
-                    refine_landmarks=True, 
-                    min_detection_confidence=0.5
-                ) as face_mesh:
-                    results = face_mesh.process(img_array)
+                try:
+                    img_array = np.array(image)
                     
-                    if not results.multi_face_landmarks:
-                        st.error("얼굴을 찾을 수 없습니다. 정면이 잘 보이는 사진을 올려주세요.")
-                    else:
-                        # 랜드마크가 그려질 이미지 복사본
-                        annotated_image = img_array.copy()
-                        face_landmarks = results.multi_face_landmarks[0]
+                    # MediaPipe 호출 
+                    mp_face_mesh = mp.solutions.face_mesh
+                    mp_drawing = mp.solutions.drawing_utils
+                    mp_drawing_styles = mp.solutions.drawing_styles
+                    
+                    with mp_face_mesh.FaceMesh(
+                        static_image_mode=True, 
+                        max_num_faces=1, 
+                        refine_landmarks=True, 
+                        min_detection_confidence=0.5
+                    ) as face_mesh:
+                        results = face_mesh.process(img_array)
                         
-                        # 468개 좌표 그리기
-                        mp_drawing.draw_landmarks(
-                            image=annotated_image,
-                            landmark_list=face_landmarks,
-                            connections=mp_face_mesh.FACEMESH_TESSELATION,
-                            landmark_drawing_spec=None,
-                            connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style()
-                        )
-                        mp_drawing.draw_landmarks(
-                            image=annotated_image,
-                            landmark_list=face_landmarks,
-                            connections=mp_face_mesh.FACEMESH_CONTOURS,
-                            landmark_drawing_spec=None,
-                            connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style()
-                        )
-                        
-                        # 시각화 결과 출력
-                        st.image(annotated_image, caption="AI 랜드마크 스캔 완료", use_container_width=True)
-                        
-                        # 실제 좌표를 활용한 거리 계산 로직 (간단한 예시)
-                        # 랜드마크 인덱스: 왼쪽 눈 끝(33), 오른쪽 눈 끝(263), 코끝(1), 턱끝(152)
-                        h, w, _ = img_array.shape
-                        left_eye = face_landmarks.landmark[33]
-                        right_eye = face_landmarks.landmark[263]
-                        nose_tip = face_landmarks.landmark[1]
-                        chin = face_landmarks.landmark[152]
-                        
-                        # 좌표 픽셀 변환
-                        lx, ly = int(left_eye.x * w), int(left_eye.y * h)
-                        rx, ry = int(right_eye.x * w), int(right_eye.y * h)
-                        nx, ny = int(nose_tip.x * w), int(nose_tip.y * h)
-                        cx, cy = int(chin.x * w), int(chin.y * h)
-                        
-                        eye_distance = np.sqrt((rx - lx)**2 + (ry - ly)**2)
-                        nose_to_chin = cy - ny
-                        
-                        # 계산된 데이터를 기반으로 분석 결과 출력
-                        st.success("✅ 실제 AI 안면 분석이 완료되었습니다.")
-                        st.markdown(f"""
-                        ### 📊 실제 측정 데이터 기반 리포트
-                        
-                        **1. 감지된 특징점**
-                        - 모델이 얼굴에서 총 **468개**의 3D 랜드마크를 성공적으로 인식했습니다.
-                        - 얼굴의 폭 대비 눈 사이의 거리 및 코, 턱의 위치를 실제 픽셀 좌표로 분석했습니다.
-                        
-                        **2. 주요 비율 분석 (Real Data)**
-                        - 양 눈의 양끝 픽셀 거리: `{eye_distance:.2f}px`
-                        - 코끝에서 턱끝까지의 수직 거리: `{nose_to_chin:.2f}px`
-                        - **분석 코멘트**: "MediaPipe 텐서플로우 모델이 얼굴 윤곽과 이목구비 깊이를 정상적으로 추적했습니다. (상위 퍼센트 등급은 수많은 타인 데이터셋 비교가 필요하므로, 현재는 본인의 절대적 랜드마크 비율만 추출합니다.)"
-                        """)
+                        if not results.multi_face_landmarks:
+                            st.error("얼굴을 찾을 수 없습니다. 정면이 잘 보이는 사진을 올려주세요.")
+                        else:
+                            annotated_image = img_array.copy()
+                            face_landmarks = results.multi_face_landmarks[0]
+                            
+                            # 468개 좌표 그리기
+                            mp_drawing.draw_landmarks(
+                                image=annotated_image,
+                                landmark_list=face_landmarks,
+                                connections=mp_face_mesh.FACEMESH_TESSELATION,
+                                landmark_drawing_spec=None,
+                                connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style()
+                            )
+                            mp_drawing.draw_landmarks(
+                                image=annotated_image,
+                                landmark_list=face_landmarks,
+                                connections=mp_face_mesh.FACEMESH_CONTOURS,
+                                landmark_drawing_spec=None,
+                                connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style()
+                            )
+                            
+                            st.image(annotated_image, caption="AI 랜드마크 스캔 완료", use_container_width=True)
+                            
+                            # 픽셀 좌표 거리 계산
+                            h, w, _ = img_array.shape
+                            left_eye = face_landmarks.landmark[33]
+                            right_eye = face_landmarks.landmark[263]
+                            nose_tip = face_landmarks.landmark[1]
+                            chin = face_landmarks.landmark[152]
+                            
+                            lx, ly = int(left_eye.x * w), int(left_eye.y * h)
+                            rx, ry = int(right_eye.x * w), int(right_eye.y * h)
+                            nx, ny = int(nose_tip.x * w), int(nose_tip.y * h)
+                            cx, cy = int(chin.x * w), int(chin.y * h)
+                            
+                            eye_distance = np.sqrt((rx - lx)**2 + (ry - ly)**2)
+                            nose_to_chin = cy - ny
+                            
+                            st.success("✅ 실제 AI 안면 분석이 완료되었습니다.")
+                            st.markdown(f"""
+                            ### 📊 실제 측정 데이터 기반 리포트
+                            
+                            **1. 감지된 특징점**
+                            - 모델이 얼굴에서 총 **468개**의 3D 랜드마크를 성공적으로 인식했습니다.
+                            
+                            **2. 주요 비율 분석 (Real Data)**
+                            - 양 눈의 양끝 픽셀 거리: `{eye_distance:.2f}px`
+                            - 코끝에서 턱끝까지의 수직 거리: `{nose_to_chin:.2f}px`
+                            - **분석 코멘트**: "MediaPipe 텐서플로우 모델이 얼굴 윤곽과 이목구비 깊이를 정상적으로 추적했습니다."
+                            """)
+                except Exception as e:
+                    st.error(f"MediaPipe 분석 중 오류 발생 (requirements.txt 버전을 확인하세요): {e}")
 
 # ==========================================
-# 탭 4: 인스타그램 언팔 확인기 (ZIP 통째로 분석)
+# 탭 4: 인스타그램 언팔 확인기 (강력해진 최신버전)
 # ==========================================
 with tab4:
     st.subheader("🕵️ 인스타그램 언팔로워(맞팔) 자동 분석기")
-    st.markdown("인스타그램에서 다운받은 **.zip 파일 하나만 그대로 업로드**하면, 코드가 알아서 팔로워/팔로잉 데이터를 찾아 비교합니다.")
+    st.markdown("인스타그램에서 다운받은 **.zip 파일**을 그대로 업로드하세요. 쪼개진 모든 팔로워 파일을 합쳐서 정확히 분석합니다.")
     
     uploaded_zip = st.file_uploader("인스타 정보 다운로드 파일 (.zip)", type=["zip"], key="ig_zip")
 
     if st.button("내 ZIP 파일 분석하기"):
         if uploaded_zip:
             try:
-                followers_data = None
-                following_data = None
+                followers_data_list = []
+                following_data_list = []
                 
-                # ZIP 파일 메모리에서 읽기
+                # ZIP 파일 내부의 모든 follower/following 관련 JSON 파일 찾기
                 with zipfile.ZipFile(uploaded_zip, 'r') as z:
                     for filename in z.namelist():
-                        # 파일 이름에 followers_1.json 또는 following.json이 포함되어 있는지 검사
-                        if 'followers_1.json' in filename or 'followers.json' in filename:
-                            with z.open(filename) as f:
-                                followers_data = json.load(f)
-                        elif 'following.json' in filename:
-                            with z.open(filename) as f:
-                                following_data = json.load(f)
+                        lower_name = filename.lower()
+                        if lower_name.endswith('.json'):
+                            if 'follower' in lower_name:
+                                with z.open(filename) as f:
+                                    followers_data_list.append(json.load(f))
+                            elif 'following' in lower_name:
+                                with z.open(filename) as f:
+                                    following_data_list.append(json.load(f))
                 
-                if not followers_data or not following_data:
-                    st.error("ZIP 파일 안에서 팔로워 또는 팔로잉 JSON 파일을 찾지 못했습니다. 인스타에서 전체 데이터를 다운로드했는지 확인해주세요.")
+                if not followers_data_list or not following_data_list:
+                    st.error("ZIP 파일 내부에 팔로워/팔로잉 데이터가 없습니다. 인스타에서 전체 데이터를 다운받았는지 확인하세요.")
                 else:
-                    def extract_usernames(json_obj):
+                    # 인스타 최신/구형 데이터 구조 모두 대응하는 파싱 함수
+                    def extract_usernames(json_list):
                         usernames = set()
                         def search_keys(obj):
                             if isinstance(obj, dict):
-                                if "href" in obj and "value" in obj and "instagram.com" in obj["href"]:
+                                # 최신 인스타 포맷
+                                if "string_list_data" in obj and isinstance(obj["string_list_data"], list):
+                                    for item in obj["string_list_data"]:
+                                        if isinstance(item, dict) and "value" in item:
+                                            usernames.add(item["value"])
+                                # 구형 인스타 포맷
+                                elif "href" in obj and "value" in obj and isinstance(obj["href"], str) and "instagram.com" in obj["href"]:
                                     usernames.add(obj["value"])
                                 else:
                                     for k, v in obj.items():
@@ -202,11 +206,13 @@ with tab4:
                             elif isinstance(obj, list):
                                 for item in obj:
                                     search_keys(item)
-                        search_keys(json_obj)
+                        
+                        for data in json_list:
+                            search_keys(data)
                         return usernames
 
-                    my_followers = extract_usernames(followers_data)
-                    my_following = extract_usernames(following_data)
+                    my_followers = extract_usernames(followers_data_list)
+                    my_following = extract_usernames(following_data_list)
 
                     unfollowers = my_following - my_followers
                     
