@@ -8,11 +8,8 @@ import numpy as np
 import os
 from PIL import Image
 
-# MediaPipe 내부 모듈 직접 호출 (AttributeError 우회)
+# 이상한 꼼수 경로 다 삭제하고 정석대로 딱 하나만 임포트
 import mediapipe as mp
-import mediapipe.python.solutions.face_mesh as mp_face_mesh
-import mediapipe.python.solutions.drawing_utils as mp_drawing
-import mediapipe.python.solutions.drawing_styles as mp_drawing_styles
 
 st.set_page_config(page_title="통합 데이터 도구", layout="centered")
 
@@ -80,7 +77,7 @@ with tab2:
                 st.error(f"오류: {e}")
 
 # ==========================================
-# 탭 3: 얼굴 상세 분석기 (MediaPipe 오류 우회 적용)
+# 탭 3: 얼굴 상세 분석기 (MediaPipe 정석 적용)
 # ==========================================
 with tab3:
     st.subheader("🤖 AI 안면 구조 및 랜드마크 분석기")
@@ -96,6 +93,11 @@ with tab3:
                 try:
                     img_array = np.array(image)
                     
+                    # MediaPipe 정석 솔루션 호출
+                    mp_face_mesh = mp.solutions.face_mesh
+                    mp_drawing = mp.solutions.drawing_utils
+                    mp_drawing_styles = mp.solutions.drawing_styles
+                    
                     with mp_face_mesh.FaceMesh(
                         static_image_mode=True, 
                         max_num_faces=1, 
@@ -110,6 +112,7 @@ with tab3:
                             annotated_image = img_array.copy()
                             face_landmarks = results.multi_face_landmarks[0]
                             
+                            # 랜드마크 그리기
                             mp_drawing.draw_landmarks(
                                 image=annotated_image,
                                 landmark_list=face_landmarks,
@@ -127,6 +130,7 @@ with tab3:
                             
                             st.image(annotated_image, caption="AI 랜드마크 스캔 완료", use_container_width=True)
                             
+                            # 좌표 계산
                             h, w, _ = img_array.shape
                             left_eye = face_landmarks.landmark[33]
                             right_eye = face_landmarks.landmark[263]
@@ -154,7 +158,7 @@ with tab3:
                     st.error(f"분석 중 오류 발생: {e}")
 
 # ==========================================
-# 탭 4: 인스타그램 언팔 확인기 (버그 완벽 수정)
+# 탭 4: 인스타그램 언팔 확인기
 # ==========================================
 with tab4:
     st.subheader("🕵️ 인스타그램 언팔로워(맞팔) 자동 분석기")
@@ -171,7 +175,6 @@ with tab4:
                 
                 with zipfile.ZipFile(uploaded_zip, 'r') as z:
                     for filename in z.namelist():
-                        # 파일 이름만 추출 (폴더 경로 무시)
                         basename = os.path.basename(filename).lower()
                         
                         if basename.startswith('follower'):
